@@ -21,12 +21,12 @@ export default async function handler(req) {
       {
         headers: {
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "content-type": "application/json",
+          "Content-Type": "application/json",
         },
         method: "POST",
         body: JSON.stringify({
           model: "gpt-3.5-turbo",
-          message: [{ content: message, role: "user" }],
+          message: [{ role: "user", content: message }],
           stream: true,
         }),
       }
@@ -35,5 +35,6 @@ export default async function handler(req) {
     return new Response(stream);
   } catch (error) {
     console.error("Error in API:", error.message);
+    return new Response("Error: " + error.message, { status: 500 });
   }
 }

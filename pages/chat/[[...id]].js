@@ -1,35 +1,76 @@
 import Head from "next/head";
 import { ChatSidebar } from "components/ChatSidebar";
-import { use, useState } from "react";
+import { useEffects, use, useState } from "react";
 import { streamReader } from "openai-edge-stream";
-
+import { Message } from "components/Message";
+import { v4 as uuid } from "uuid";
 export default function ChatPage() {
   const [incomingText, setIncomingText] = useState("");
   const [messageText, setMessageText] = useState("");
+  const [newMessages, setNewMessages] = useState([]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log("Message: ", messageText);
-    try {
-      const res = await fetch("/api/chat/sendMessage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: messageText,
-        }),
-      });
+    setNewMessages((prev) => {
+      const newMessages = [
+        ...prev,
+        {
+          _id: uuid(),
+          role: "user",
+          content: messageText,
+        },
+      ];
+      return newMessages;
+    });
+    // if (messageText.length > 1) {
+    //   const userMessage = { role: "user", content: messageText };
+    //   setMessages((prevMessages) => [...prevMessages, userMessage]);
 
-      const data = res.body;
-      if (!data) {
-        return;
-      }
-      const reader = data.getReader();
-      await streamReader(reader, async (message) => {
-        setIncomingText((s) => `${s}${message.content}`);
-        console.log(message);
-      });
-    } catch (error) {
-      console.error("Error:", error.message);
-    }
+    //   const botTypingMessage = { role: "assistant", content: "..." };
+    //   setMessages((prevMessages) => [...prevMessages, botTypingMessage]);
+
+    //   // Simulate a delay for the bot's response
+    //   setTimeout(() => {
+    //     // Replace the bot "typing" message with the actual bot response
+    //     const botMessage = {
+    //       role: "assistant",
+    //       content: "Sorry, can't do that now.",
+    //     };
+    //     setMessages((prevMessages) => {
+    //       // Remove the "typing" message and add the bot's final response
+    //       const updatedMessages = [...prevMessages];
+    //       updatedMessages.pop(); // Remove the "typing" message
+    //       return [...updatedMessages, botMessage];
+    //     });
+    //   }, 3000);
+    //   // setMessageText("");
+    // }
+    // try {
+    //   const res = await fetch("/api/chat/sendMessage", {
+    //     method: "POST",
+    //     headers: { "Content-Type": "application/json" },
+    //     body: JSON.stringify({
+    //       message: messageText,
+    //     }),
+    //   });
+
+    //   const data = res.body;
+    //   if (!res.body) {
+    //     console.log("No response body from server");
+
+    //     return;
+    //   }
+    //   console.log("something bruv ", data);
+
+    //   const reader = res.body.getReader();
+    //   await streamReader(reader, async ({ content }) => {
+    //     setIncomingText((s) => `${s}${message.content}`);
+    //     console.log("New incoming message: ", content);
+    //   });
+    // } catch (error) {
+    //   console.error("Error:", error.message);
+    // }
   };
   return (
     <>
@@ -39,7 +80,18 @@ export default function ChatPage() {
       <div className="grid h-screen grid-cols-[260px_1fr]">
         <ChatSidebar />
         <div className="flex flex-col bg-gray-700 ">
-          <div className="flex-1 text-white">{incomingText}</div>
+          <div className="flex-1 text-white">
+            {newMessages.map((message) => (
+              <Message
+                key={message._id}
+                content={message.content}
+                role={message.role}
+              />
+            ))}
+            {!!incomingText && (
+              <Message content={incomingText} role="assistant" />
+            )}
+          </div>
           <footer className="bg-gray-800 p-10">
             <form onSubmit={handleSubmit}>
               <fieldset className="flex gap-2 ">
