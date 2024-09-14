@@ -8,9 +8,11 @@ export default function ChatPage() {
   const [incomingText, setIncomingText] = useState("");
   const [messageText, setMessageText] = useState("");
   const [newMessages, setNewMessages] = useState([]);
+  const [gettingResponse, setGettingResponse] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     console.log("Message: ", messageText);
     setNewMessages((prev) => {
       const newMessages = [
@@ -23,6 +25,18 @@ export default function ChatPage() {
       ];
       return newMessages;
     });
+    const response = await fetch("/api/chat/createNewChat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: messageText,
+      }),
+    });
+    const json = await response.json();
+    console.log("New chat: ", json);
+
     // if (messageText.length > 1) {
     //   const userMessage = { role: "user", content: messageText };
     //   setMessages((prevMessages) => [...prevMessages, userMessage]);
@@ -79,8 +93,8 @@ export default function ChatPage() {
       </Head>
       <div className="grid h-screen grid-cols-[260px_1fr]">
         <ChatSidebar />
-        <div className="flex flex-col bg-gray-700 ">
-          <div className="flex-1 text-white">
+        <div className="flex flex-col overflow-hidden bg-gray-700">
+          <div className="flex-1 overflow-auto  text-white">
             {newMessages.map((message) => (
               <Message
                 key={message._id}
@@ -94,12 +108,12 @@ export default function ChatPage() {
           </div>
           <footer className="bg-gray-800 p-10">
             <form onSubmit={handleSubmit}>
-              <fieldset className="flex gap-2 ">
+              <fieldset className="flex gap-2 " disabled={gettingResponse}>
                 <textarea
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   className="w-full resize-none rounded-md bg-gray-700 p-2 text-white  focus:border-emerald-500 focus:bg-gray-600 focus:outline focus:outline-emerald-500"
-                  placeholder="Send a message..."
+                  placeholder={gettingResponse ? "" : "Send a message..."}
                 />
                 <button type="submit" className="btn">
                   Send
