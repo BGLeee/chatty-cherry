@@ -11,17 +11,56 @@ export const runtime = "edge";
 
 // const openai = new OpenAIApi(configuration);
 export default async function handler(req) {
-  const { message } = await req.json();
-
-  console.log("Here also: ", message);
-
   try {
+    const { chatId: chatIdFromParam, message } = await req.json();
+    let chatId = chatIdFromParam;
+
     const initialChatMessage = {
       role: "system",
       content:
-        "You'r name is chatty-chary. An incredible intelligent and quick-thinking AI, And are avery helpful assistant.",
+        "You'r name is chatty-chary. An incredible intelligent and quick-thinking AI, And are a very helpful assistant.",
     };
-
+    let newChatId;
+    if (chatId) {
+      //add message to chat
+      const response = await fetch(
+        `${req.headers.get("origin")}/api/chat/addMessageToChat`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            cookie: req.headers.get("cookie"),
+          },
+          body: JSON.stringify({
+            chatId,
+            role: "user",
+            content: message,
+          }),
+        }
+      );
+      const json = await response.json();
+      chatId = json._id;
+      newChatId = json._id;
+      console.log("old chat: ", json);
+    } else {
+      const response = await fetch(
+        `${req.headers.get("origin")}/api/chat/createNewChat`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            cookie: req.headers.get("cookie"),
+          },
+          body: JSON.stringify({
+            message,
+          }),
+        }
+      );
+      const json = await response.json();
+      chatId = json._id;
+      newChatId = json._id;
+      console.log("New chat: ", json);
+    }
     const stream = await OpenAIEdgeStream(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -35,6 +74,30 @@ export default async function handler(req) {
           message: [initialChatMessage, { role: "user", content: message }],
           stream: true,
         }),
+      },
+      {
+        onBeforeStream: ({ emit }) => {
+          if (newChatId) {
+            emit(chatId, "newChatId");
+          }
+        },
+        onAfterStream: async ({ fullContent }) => {
+          await fetch(
+            `${req.headers.get("origin")}/api/chat/addMessageToChat`,
+            {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                cookie: req.headers.get("cookie"),
+              },
+              body: JSON.stringify({
+                chatId,
+                role: "assistant",
+                content: fullContent,
+              }),
+            }
+          );
+        },
       }
     );
 

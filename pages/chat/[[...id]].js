@@ -1,17 +1,56 @@
 import Head from "next/head";
 import { ChatSidebar } from "components/ChatSidebar";
-import { useEffects, use, useState } from "react";
+import { useEffect, use, useState } from "react";
 import { streamReader } from "openai-edge-stream";
 import { Message } from "components/Message";
 import { v4 as uuid } from "uuid";
-export default function ChatPage() {
+import { useRouter } from "next/router";
+import { getSession } from "@auth0/nextjs-auth0";
+import { ObjectId } from "mongodb";
+import clientPromise from "lib/mongodb";
+export default function ChatPage({ chatId, title, messages = [] }) {
+  // console.log("props: " + title + messages[0]);
+
+  const [newChatId, setNewChatId] = useState(null);
   const [incomingText, setIncomingText] = useState("");
   const [messageText, setMessageText] = useState("");
   const [newMessages, setNewMessages] = useState([]);
   const [gettingResponse, setGettingResponse] = useState(false);
+  const [fullMessage, setFullMessage] = useState("");
+  const router = useRouter();
+
+  //when our route changes we want to reset our state items
+  useEffect(() => {
+    setNewMessages([]), setNewChatId(null);
+  }, [chatId]);
+
+  //save the newly streamed message to new chat messages
+
+  useEffect(() => {
+    if (!gettingResponse && fullMessage) {
+      setNewMessages((prev) => [
+        ...prev,
+        {
+          _id: uuid(),
+          role: "assistant",
+          content: fullMessage,
+        },
+      ]);
+      setFullMessage("");
+    }
+  }, [gettingResponse, fullMessage]);
+
+  //if we've created a new chat then to navigate to that chat
+  useEffect(() => {
+    if (!gettingResponse && newChatId) {
+      setNewChatId(null);
+      router.push(`/chat/${newChatId}`);
+    }
+  }, [newChatId, gettingResponse, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setGettingResponse(true);
 
     console.log("Message: ", messageText);
     setNewMessages((prev) => {
@@ -25,24 +64,14 @@ export default function ChatPage() {
       ];
       return newMessages;
     });
-    const response = await fetch("/api/chat/createNewChat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: messageText,
-      }),
-    });
-    const json = await response.json();
-    console.log("New chat: ", json);
+    setMessageText("");
 
     // if (messageText.length > 1) {
     //   const userMessage = { role: "user", content: messageText };
-    //   setMessages((prevMessages) => [...prevMessages, userMessage]);
+    //   setNewMessages((prevMessages) => [...prevMessages, userMessage]);
 
     //   const botTypingMessage = { role: "assistant", content: "..." };
-    //   setMessages((prevMessages) => [...prevMessages, botTypingMessage]);
+    //   setNewMessages((prevMessages) => [...prevMessages, botTypingMessage]);
 
     //   // Simulate a delay for the bot's response
     //   setTimeout(() => {
@@ -51,51 +80,68 @@ export default function ChatPage() {
     //       role: "assistant",
     //       content: "Sorry, can't do that now.",
     //     };
-    //     setMessages((prevMessages) => {
+    //     setNewMessages((prevMessages) => {
     //       // Remove the "typing" message and add the bot's final response
     //       const updatedMessages = [...prevMessages];
     //       updatedMessages.pop(); // Remove the "typing" message
     //       return [...updatedMessages, botMessage];
     //     });
     //   }, 3000);
-    //   // setMessageText("");
+
+    //   setMessageText("");
     // }
-    // try {
-    //   const res = await fetch("/api/chat/sendMessage", {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify({
-    //       message: messageText,
-    //     }),
-    //   });
+    try {
+      const res = await fetch("/api/chat/sendMessage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId,
+          message: messageText,
+        }),
+      });
 
-    //   const data = res.body;
-    //   if (!res.body) {
-    //     console.log("No response body from server");
+      const data = res.body;
+      if (!res.body) {
+        console.log("No response body from server");
 
-    //     return;
-    //   }
-    //   console.log("something bruv ", data);
+        return;
+      }
 
-    //   const reader = res.body.getReader();
-    //   await streamReader(reader, async ({ content }) => {
-    //     setIncomingText((s) => `${s}${message.content}`);
-    //     console.log("New incoming message: ", content);
-    //   });
-    // } catch (error) {
-    //   console.error("Error:", error.message);
-    // }
+      const reader = res.body.getReader();
+      let messageContent = "";
+      setGettingResponse(false);
+
+      await streamReader(reader, async ({ content }) => {
+        if (content.event === "newChatId") {
+          setNewChatId(content);
+        } else {
+          setIncomingText((s) => `${s}${content}`);
+          messageContent = messageContent + content;
+          setNewChatId(content);
+        }
+        setGettingResponse(false);
+
+        console.log("New incoming message: ", content);
+        setFullMessage(messageContent);
+      });
+      setIncomingText("");
+      setGettingResponse(false);
+    } catch (error) {
+      console.error("Error:", error.message);
+    }
   };
+
+  const allMessages = [...messages, ...newMessages];
   return (
     <>
       <Head>
         <title>New chat</title>
       </Head>
       <div className="grid h-screen grid-cols-[260px_1fr]">
-        <ChatSidebar />
+        <ChatSidebar chatId={chatId} />
         <div className="flex flex-col overflow-hidden bg-gray-700">
           <div className="flex-1 overflow-auto  text-white">
-            {newMessages.map((message) => (
+            {!!allMessages}{allMessages.map((message) => (
               <Message
                 key={message._id}
                 content={message.content}
@@ -126,3 +172,29 @@ export default function ChatPage() {
     </>
   );
 }
+
+export const getServerSideProps = async (ctx) => {
+  const chatId = ctx.params?.id?.[0] || null;
+  if (chatId) {
+    const { user } = await getSession(ctx.req, ctx.res);
+    const client = await clientPromise;
+    const db = client.db("ChattyCherry");
+    const chat = await db.collection("chats").findOne({
+      userId: user.sub,
+      _id: new ObjectId(chatId),
+    });
+    return {
+      props: {
+        chatId,
+        title: chat.title,
+        messages: chat.messages.map((message) => ({
+          ...message,
+          _id: uuid(),
+        })),
+      },
+    };
+  }
+  return {
+    props: {},
+  };
+};
