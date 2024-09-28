@@ -16,7 +16,11 @@ export default function Home() {
     }
   }, [user, router]);
 
-  if (isLoading) return <div>Loading...</div>;
+  if (isLoading) return (
+    <div className="flex min-h-screen w-full flex-col items-center justify-center gap-5 bg-gray-800 text-center text-white">
+      Loading...
+    </div>
+  );
   if (error) return <div>{error.message}</div>;
 
   return (
@@ -24,23 +28,32 @@ export default function Home() {
       <Head>
         <title>Chatty pete - Login or Signup</title>
       </Head>
-      <div className="flex min-h-screen w-full flex-col items-center justify-center gap-8 bg-gray-800 text-center text-white">
-        <Image
-          src={"/robot-img.png"}
-          width={100}
-          height={100}
-          alt="user avatar"
-        />
-        <h1 className="font-inter text-4xl font-bold">Chatty Cherry</h1>
+      <div className="flex min-h-screen w-full flex-col items-center justify-center gap-5 bg-gray-800 text-center text-white">
+        <div className="flex flex-col items-center ">
+          <Image
+            src={"/robot-img.png"}
+            width={100}
+            height={100}
+            alt="user avatar"
+          />
+          <h1 className="font-inter mb-3 text-4xl font-bold">
+            Welcome to Chatty Cherry
+          </h1>
+          <p>Log in with your account to continue</p>
+        </div>
         <div className="flex gap-6">
-          {!!user && <Link href={"/api/auth/logout"}>Logout</Link>}
+          {!!user && (
+            <Link href={"/api/auth/logout"} className="btn">
+              Log out
+            </Link>
+          )}
           {!user && (
             <>
               <Link href={"/api/auth/login"} className="btn">
-                Login
+                Log in
               </Link>
               <Link href={"/api/auth/signup"} className="btn">
-                Signup
+                Sign up
               </Link>
             </>
           )}

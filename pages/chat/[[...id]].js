@@ -8,6 +8,8 @@ import { useRouter } from "next/router";
 import { getSession } from "@auth0/nextjs-auth0";
 import { ObjectId } from "mongodb";
 import clientPromise from "lib/mongodb";
+import Image from "next/image";
+
 export default function ChatPage({ chatId, title, messages = [] }) {
   // console.log("props: " + title + messages[0]);
 
@@ -140,16 +142,36 @@ export default function ChatPage({ chatId, title, messages = [] }) {
       <div className="grid h-screen grid-cols-[260px_1fr]">
         <ChatSidebar chatId={chatId} />
         <div className="flex flex-col overflow-hidden bg-gray-700">
-          <div className="flex-1 overflow-auto  text-white">
-            {!!allMessages}{allMessages.map((message) => (
-              <Message
-                key={message._id}
-                content={message.content}
-                role={message.role}
-              />
-            ))}
-            {!!incomingText && (
-              <Message content={incomingText} role="assistant" />
+          <div
+            className={`  flex-1 ${
+              allMessages.length > 0 ? "" : "item-center flex justify-center"
+            } overflow-auto text-white`}
+          >
+            {allMessages.length > 0 ? (
+              <>
+                {allMessages.map((message) => (
+                  <Message
+                    key={message._id}
+                    content={message.content}
+                    role={message.role}
+                  />
+                ))}
+                {!!incomingText && (
+                  <Message content={incomingText} role="assistant" />
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center">
+                <Image
+                  src={"/robot-img.png"}
+                  width={100}
+                  height={100}
+                  alt="user avatar"
+                />
+                <h1 className="font-inter text-center text-4xl font-bold text-gray-300">
+                  Ask me a question!
+                </h1>
+              </div>
             )}
           </div>
           <footer className="bg-gray-800 p-10">
