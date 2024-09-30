@@ -168,7 +168,9 @@ export default function ChatPage({ chatId, title, messages = [] }) {
                   height={100}
                   alt="user avatar"
                 />
+
                 <h1 className="font-inter text-center text-4xl font-bold text-gray-300">
+
                   Ask me a question!
                 </h1>
               </div>
